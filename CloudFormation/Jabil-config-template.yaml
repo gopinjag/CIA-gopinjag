@@ -1,0 +1,613 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: This is CloudFormation template to implement AWS Config rule in AWS Account
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      -
+        Label:
+          default: EBS Inuse Config Rule
+        Parameters:
+          - ebsInuseConfigRuleName
+          - ebsInuseDeleteOnTermination
+      
+      -
+        Label:
+          default: TimeStream Configuration
+        Parameters:
+          - timeStreamFunctionName
+          - timeStreamDBName
+          - timeStreamTableName
+          - timeStreamDbKmsKey
+          - timeStreamTableRegion
+      -
+        Label:
+          default: Required Tags Config Rule
+        Parameters:
+          - requiredTagsConfigRuleName
+          - requiredTags1Key
+          - requiredTags1Value
+          - requiredTags2Key
+          - requiredTags2Value
+          - requiredTags3Key
+          - requiredTags3Value
+          - requiredTags4Key
+          - requiredTags4Value
+          - requiredTags5Key
+          - requiredTags5Value
+          - requiredTags6Key
+          - requiredTags6Value
+
+    ParameterLabels:
+      ebsInuseConfigRuleName:
+        default: EBS In-use config rule name
+      ebsInuseDeleteOnTermination:
+        default: DeleteOn protection (true or false)
+      timeStreamFunctionName:
+        default: AWS TimeStream Lambda Function name
+      timeStreamDBName:
+        default: TimeStream Database Name
+      timeStreamDbKmsKey:
+        default: Customer Managed KMS Key to encrypt the timestream Database 
+      timeStreamTableName:
+        default: TimeStream table Name
+      timeStreamTableRegion: 
+        default: The region in which timeStream table will be created 
+      requiredTagsConfigRuleName:
+        default: Required tags config rule name
+      requiredTags1Key:
+        default: Key-1 of the required tag
+      requiredTags1Value:
+        default: Optional value-1 of the required tag. Separate multiple values with commas.
+      requiredTags2Key:
+        default: Key-2 of the required tag
+      requiredTags2Value:
+        default: Optional value-2 of the required tag. Separate multiple values with commas.
+      requiredTags3Key:
+        default: Key-3 of the required tag
+      requiredTags3Value:
+        default: Optional value-3 of the required tag. Separate multiple values with commas.
+      requiredTags4Key:
+        default: Key-4 of the required tag
+      requiredTags4Value:
+        default: Optional value-4 of the required tag. Separate multiple values with commas.
+      requiredTags5Key:
+        default: Key-5 of the required tag
+      requiredTags5Value:
+        default: Optional value-5 of the required tag. Separate multiple values with commas.
+      requiredTags6Key:
+        default: Key-6 of the required tag
+      requiredTags6Value:
+        default: Optional value-6 of the required tag. Separate multiple values with commas.
+
+Parameters: 
+  ebsInuseConfigRuleName:
+    Type: String
+
+  ebsInuseDeleteOnTermination:
+    Type: String
+    Default: ""
+    
+  timeStreamDBName:
+    Type: String
+    Default: TimeStreamDB
+  
+  timeStreamDbKmsKey:
+    Type: String
+    Default: ""
+      
+  timeStreamTableName:
+    Type: String
+    Default: TimeStreamTable
+
+  timeStreamFunctionName:
+    Type: String
+    Default: TimeStreamLambdaFunction
+  
+  timeStreamTableRegion: 
+    Type: String
+    Default: "us-east-1"
+    AllowedValues: ["us-east-1","us-east-2","us-west-1","eu-west-1"]
+    Description: "Enter us-east-1, us-east-2, us-west-1 or eu-west-1 . Default is us-east-1 . These are the regions Timestream supported currently , additional information can be found on https://aws.amazon.com/about-aws/whats-new/2020/09/amazon-timestream-now-generally-available/ "
+
+  requiredTagsConfigRuleName:
+    Type: String
+  requiredTags1Key:
+    Type: String
+  requiredTags1Value:
+    Type: String
+  requiredTags2Key:
+    Type: String
+  requiredTags2Value:
+    Type: String
+  requiredTags3Key:
+    Type: String
+  requiredTags3Value:
+    Type: String
+  requiredTags4Key:
+    Type: String
+  requiredTags4Value:
+    Type: String
+  requiredTags5Key:
+    Type: String
+  requiredTags5Value:
+    Type: String
+  requiredTags6Key:
+    Type: String
+  requiredTags6Value:
+    Type: String
+
+Conditions: 
+  ebsInuseDeleteOnTermination:
+    !Not [!Equals ["", !Ref ebsInuseDeleteOnTermination]]
+  CreateDBWithKms:
+    !Not [!Equals ["", !Ref timeStreamDbKmsKey]]
+  TimeStreamTableCreation: 
+    !Equals [!Ref AWS::Region, !Ref timeStreamTableRegion]
+
+Resources: 
+
+  # # Config rule Nested stack deployment - The Logical Resource Id "ebsInuseStack" and "requiredTags" are two nested stack to deploy two Config rules , ebsInuseStack to check if EBS volume is in use and the requiredTags to check if required tags are present  
+
+  # # Nested Stack for EBS Config Rule
+  ebsInuseStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: http://s3.amazonaws.com/aws-configservice-us-east-1/cloudformation-templates-for-managed-rules/EC2_VOLUME_INUSE_CHECK.template
+      Parameters:
+        ConfigRuleName: !Ref ebsInuseConfigRuleName
+        deleteOnTermination: !Ref ebsInuseDeleteOnTermination
+
+  # # Nested Stack for Required Tag Config Rule
+  requiredTags:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: http://s3.amazonaws.com/aws-configservice-us-east-1/cloudformation-templates-for-managed-rules/REQUIRED_TAGS.template
+      Parameters:
+        ConfigRuleName: !Ref requiredTagsConfigRuleName
+        tag1Key: !Ref requiredTags1Key
+        tag1Value: !Ref requiredTags1Value
+        tag2Key: !Ref requiredTags2Key
+        tag2Value: !Ref requiredTags2Value
+        tag3Key: !Ref requiredTags3Key
+        tag3Value: !Ref requiredTags3Value
+        tag4Key: !Ref requiredTags4Key
+        tag4Value: !Ref requiredTags4Value
+        tag5Key: !Ref requiredTags5Key
+        tag5Value: !Ref requiredTags5Value
+        tag6Key: !Ref requiredTags6Key
+        tag6Value: !Ref requiredTags6Value
+
+  # # TimeStream DB creation - Creation of TimeStream Database and table 
+
+  # # TimeStream Database creation 
+  TimeStreamDB:
+    Type: AWS::Timestream::Database
+    Condition: TimeStreamTableCreation
+    Properties: 
+      DatabaseName: !Ref timeStreamDBName
+      KmsKeyId:
+        !If [CreateDBWithKms, !Ref timeStreamDbKmsKey, !Ref "AWS::NoValue"]
+  
+  # # TimeStream Table Creation 
+  TimeStreamTable:
+    Type: AWS::Timestream::Table
+    Condition: TimeStreamTableCreation
+    DependsOn: 
+      - TimeStreamDB
+    Properties: 
+      DatabaseName: !Ref timeStreamDBName
+      TableName: !Ref timeStreamTableName
+  # #  IAM role deployment - The Logical Resource Id "ScheduleLambdaIAM" and "timeStreamLambdaIAM" are two IAM roles which will be used for the config rule periodic , config rule compliance check and Timestream Lambda functions
+
+  # # Scheduled Lambda Function IAM Role Permissions
+  ScheduleLambdaIAM:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com 
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - 
+         PolicyName: "ConfigAccess"
+         PolicyDocument:
+           Version: "2012-10-17"
+           Statement:
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogGroup'
+                Resource: 
+                  - !Join 
+                    - ""
+                    - - 'arn:aws:logs:'
+                      - !Ref AWS::Region
+                      - ':'
+                      - !Ref AWS::AccountId
+                      - ':log-group:/aws/lambda/'
+                      - !Ref ebsInuseConfigRuleName
+                      - '-schedule-lambda-function:*'
+                  - !Join 
+                    - ""
+                    - - 'arn:aws:logs:'
+                      - !Ref AWS::Region
+                      - ':'
+                      - !Ref AWS::AccountId
+                      - ':log-group:/aws/lambda/'
+                      - !Ref ebsInuseConfigRuleName
+                      - '-config-change-lambda-function:*'
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource: 
+                  - !Join 
+                    - ""
+                    - - 'arn:aws:logs:'
+                      - !Ref AWS::Region
+                      - ':'
+                      - !Ref AWS::AccountId
+                      - ':log-group:/aws/lambda/'
+                      - !Ref ebsInuseConfigRuleName
+                      - '-schedule-lambda-function:'
+                      - 'log-stream:*'
+                  - !Join 
+                    - ""
+                    - - 'arn:aws:logs:'
+                      - !Ref AWS::Region
+                      - ':'
+                      - !Ref AWS::AccountId
+                      - ':log-group:/aws/lambda/'
+                      - !Ref ebsInuseConfigRuleName
+                      - '-config-change-lambda-function:'
+                      - 'log-stream:*'
+
+              - Effect: Allow
+                Action: 'cloudwatch:PutMetricData'
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    'cloudwatch:namespace': UnattachedEBS
+              - Effect: Allow
+                Action: 'config:GetComplianceDetailsByConfigRule'
+                Resource: '*'
+
+  # # TimeStream Lambda Function IAM Role Permissions
+  timeStreamLambdaIAM:
+    Type: AWS::IAM::Role
+    #DependsOn:
+    #  - TimeStreamDB
+    #  - TimeStreamTable
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com 
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - 
+         PolicyName: "TimeStreamAccess"
+         PolicyDocument:
+           Version: "2012-10-17"
+           Statement:
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogGroup'
+                Resource: !Sub 
+                  arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${timeStreamFunctionName}:*
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource: !Sub
+                  arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${timeStreamFunctionName}:log-stream:*
+              - Effect: Allow
+                Action:
+                  - 'timestream:DescribeEndpoints'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'timestream:DescribeDatabase'
+                Resource: !Sub 
+                  arn:aws:timestream:${timeStreamTableRegion}:${AWS::AccountId}:database/${timeStreamDBName}
+              - Effect: Allow
+                Action:
+                  - 'timestream:WriteRecords'
+                  - 'timestream:DescribeTable'
+                Resource: !Sub 
+                  arn:aws:timestream:${timeStreamTableRegion}:${AWS::AccountId}:database/${timeStreamDBName}/table/${timeStreamTableName}
+              - Effect: Allow
+                Action:
+                  - 'kms:DescribeKey'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'kms:CreateGrant'
+                Resource: '*'
+                Condition:
+                  'ForAnyValue:StringEquals':
+                    'kms:EncryptionContextKeys': 'aws:timestream:database-name'
+                  Bool:
+                    'kms:GrantIsForAWSResource': true
+                  StringLike:
+                    'kms:ViaService': timestream.*.amazonaws.com
+              - Effect: Allow
+                Action:
+                  - 'ec2:DescribeVolumes'
+                Resource: '*'
+  
+  
+  # # Cloudwatch Event Rule deployment - The Logical Resource Id "ebsScheduledRule" and "ebsChangeRule" are two cloudwatch event rule which will be used publish KPIs periodically and in case of compliance change 
+  
+  # # Scheduled event rule
+  ebsScheduledRule: 
+    Type: AWS::Events::Rule
+    DependsOn: 
+      - ebsScheduleLambda
+      - timeStreamLambda
+    Properties: 
+      Description: CloudWatch event rule to trigger lambda periodically for config rule data
+      ScheduleExpression: "rate(5 minutes)"
+      State: "ENABLED"
+      Targets: 
+        - 
+          Arn:
+            !GetAtt ebsScheduleLambda.Arn
+          Id: '1'
+        -
+          Arn:
+            !GetAtt timeStreamLambda.Arn
+          Id: '2'
+
+  # # Config change Event rule
+  ebsChangeRule: 
+    Type: AWS::Events::Rule
+    DependsOn: 
+      - ebsConfigChangeLambda
+      - timeStreamLambda
+    Properties: 
+      Description: CloudWatch event rule to trigger lambda periodically for config rule data
+      EventPattern:
+        source:
+          - aws.config
+        detail-type: 
+          - "Config Rules Compliance Change"
+        detail: 
+          configRuleName: 
+            - !Ref ebsInuseConfigRuleName
+      State: "ENABLED"
+      Targets: 
+        - 
+          Arn:
+            !GetAtt ebsConfigChangeLambda.Arn
+          Id: '2'
+        -
+          Arn:
+            !GetAtt timeStreamLambda.Arn
+          Id: '1'
+  # #  Lambda Function deployment - The Logical Resource Id "ebsScheduleLambda" , "timeStreamLambda" and  "ebsConfigChangeLambda" are three Lambda Functions which will be used to publish the data to cloudwatch , timestream and finally to grafana
+  
+  # # Scheduled Lambda Function
+  ebsScheduleLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: AWS Lambda function which triggers periodically for config rule data
+      FunctionName: !Join ["", [!Ref ebsInuseConfigRuleName, "-schedule-lambda-function"]]
+      Handler: index.lambda_handler
+      MemorySize: 128
+      Role: !GetAtt ScheduleLambdaIAM.Arn
+      Runtime: python3.9
+      Timeout: 180
+      Code:
+        ZipFile: |
+          import boto3
+          import os
+
+          client_config  = boto3.client('config')
+          cw_client = boto3.client('cloudwatch')
+
+          def put_metric(event, value):
+            response = cw_client.put_metric_data(
+                Namespace="UnattachedEBS",
+                MetricData=[
+                    {
+                        'MetricName': "Config_Rule_Metrics",
+                        'Dimensions': [{
+                            'Name': "VolumeID",
+                            'Value': event['Volume_ID']
+                        }],
+                        'Value': value
+                    }
+                ]
+            )
+
+          def lambda_handler(event, context):
+            response = client_config.get_compliance_details_by_config_rule(
+              ConfigRuleName= os.environ.get('ConfigRuleName')
+            )
+
+            for i in response['EvaluationResults']:
+              volumeId = i['EvaluationResultIdentifier']['EvaluationResultQualifier']['ResourceId']
+              state = i['ComplianceType']
+              event = {"Volume_ID": volumeId, "state": state}
+              if state == "NOT_APPLICABLE" or state == "COMPLIANT":
+                value = 0
+                put_metric(event, value)
+              elif state == "NON_COMPLIANT":
+                value = 1
+                put_metric(event, value)
+              else:
+                print("Error parsing data")              
+              print(volumeId, state)
+      Environment:
+        Variables:
+          ConfigRuleName: !Ref ebsInuseConfigRuleName
+      # Tags:
+      #   - Key: keyname
+      #     Value: value
+
+  # # TimeStream Lambda Function
+  timeStreamLambda:
+    Type: AWS::Lambda::Function
+    #DependsOn:
+      #- TimeStreamDB
+      #- TimeStreamTable
+    Properties:
+      Description: AWS Lambda Function to publish data to AWS TimeStream
+      FunctionName: !Ref timeStreamFunctionName
+      Handler: index.lambda_handler
+      MemorySize: 128
+      Role: !GetAtt timeStreamLambdaIAM.Arn
+      Runtime: python3.9
+      Timeout: 180
+      Code:
+        ZipFile: |
+          import boto3
+          import time
+          import os
+          timestream_client = boto3.client('timestream-write',region_name=os.getenv("regionName") )
+          ec2_client = boto3.client('ec2')
+          response=ec2_client.describe_volumes()
+
+          def ebs_volume():
+            for i in response['Volumes']:
+              AZ=i['AvailabilityZone']
+              VolumeID=i['VolumeId']
+              State=i['State']
+              Size=i['Size']
+              VolumeType=i['VolumeType']
+              region=AZ.rstrip(AZ[-1])
+              writeData(VolumeID,State,Size,VolumeType,AZ,region)
+
+          def writeData(VolumeID,State,Size,VolumeType,AZ,region):
+            print("Writing records")
+            current_time = str(round(time.time() * 1000))
+            dimensions = [
+            {'Name': 'region', 'Value': region},
+            {'Name': 'az', 'Value': AZ},
+            {'Name': 'VolumeID', 'Value': VolumeID},
+            {'Name': 'volumeType', 'Value': VolumeType},
+            {'Name': 'volumeState', 'Value': State}
+            ]
+            volumeSize = {
+              'Dimensions': dimensions,
+              'MeasureName': 'Volume_size',
+              'MeasureValue': str(Size),
+              'MeasureValueType': 'BIGINT',
+              'Time': current_time
+            }
+            records = [volumeSize]
+            try:
+                result = timestream_client.write_records(DatabaseName=os.getenv("dbName"), TableName=os.getenv("tableName"),
+          Records=records, CommonAttributes={})
+                print("WriteRecords Status: [%s]" % result['ResponseMetadata']['HTTPStatusCode'])
+            except timestream_client.exceptions.RejectedRecordsException as err:
+                print("RejectedRecords: ", err)
+                for rr in err.response["RejectedRecords"]:
+                    print("Rejected Index " + str(rr["RecordIndex"]) + ": " + rr["Reason"])
+                print("Other records were written successfully. ")
+            except Exception as err:
+                print("Error:", err)
+
+          def lambda_handler(event, context):
+            ebs_volume()
+      Environment:
+        Variables:
+          dbName: !Ref timeStreamDBName
+          tableName: !Ref timeStreamTableName
+          regionName: !Ref timeStreamTableRegion
+
+  # # Config change event Lambda Function
+  ebsConfigChangeLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: AWS Lambda function which triggers when config rule resource compliance changes
+      FunctionName: !Join ["", [!Ref ebsInuseConfigRuleName, "-config-change-lambda-function"]]
+      Handler: index.lambda_handler
+      MemorySize: 128
+      Role: !GetAtt ScheduleLambdaIAM.Arn
+      Runtime: python3.9
+      Timeout: 180
+      Code:
+        ZipFile: |
+          import boto3
+
+          cw_client = boto3.client('cloudwatch')
+            
+          def put_metric(event, value):
+              response = cw_client.put_metric_data(
+                  Namespace="UnattachedEBS",
+                  MetricData=[
+                      {
+                          'MetricName': "Config_Rule_Metrics",
+                          'Dimensions': [{
+                              'Name': "VolumeID",
+                              'Value': event['Volume_ID']
+                          }],
+                          'Value': value
+                      }
+                  ]
+              )
+
+          def lambda_handler(event, context):
+
+              if event["State"] == "NOT_APPLICABLE" or event["State"] == "COMPLIANT":
+                  value = 0
+                  print(event, value)
+                  put_metric(event, value)
+              elif event["State"] == "NON_COMPLIANT":
+                  value = 1
+                  print(event, value)
+                  put_metric(event, value)
+              else:
+                  print("Error parsing data")
+
+  # #  Lambda Permissions deployment - The Logical Resource Id "PermissionForEventsToInvokeTimeStreamLambdaSchedule" , "PermissionForEventsToInvokeTimeStreamLambdaChangeRule", "PermissionForEventsToInvokeLambdaSchedule" and "PermissionForEventsToInvokeLambdaChangeRule" are present to give permissions to config rule to invoke the Lambda Functions.
+
+  # # Schedule Event permission to invoke TimeStream Lambda Function
+  PermissionForEventsToInvokeTimeStreamLambdaSchedule: 
+    Type: AWS::Lambda::Permission
+    Properties: 
+      FunctionName: !Ref timeStreamLambda
+      Action: "lambda:InvokeFunction"
+      Principal: "events.amazonaws.com"
+      SourceArn: !GetAtt ebsScheduledRule.Arn
+
+  # # Config change Event permission to invoke TimeStream Lambda Function
+  PermissionForEventsToInvokeTimeStreamLambdaChangeRule: 
+    Type: AWS::Lambda::Permission
+    Properties: 
+      FunctionName: !Ref timeStreamLambda
+      Action: "lambda:InvokeFunction"
+      Principal: "events.amazonaws.com"
+      SourceArn: !GetAtt ebsChangeRule.Arn
+
+  # # Schedule Event permission to invoke Schedule Lambda Function
+  PermissionForEventsToInvokeLambdaSchedule: 
+    Type: AWS::Lambda::Permission
+    Properties: 
+      FunctionName: !Ref ebsScheduleLambda
+      Action: "lambda:InvokeFunction"
+      Principal: "events.amazonaws.com"
+      SourceArn: 
+        !GetAtt ebsScheduledRule.Arn
+
+  # # Config change rule Event permission to invoke Config change Lambda Function
+  PermissionForEventsToInvokeLambdaChangeRule: 
+    Type: AWS::Lambda::Permission
+    Properties: 
+      FunctionName: !Ref ebsConfigChangeLambda
+      Action: "lambda:InvokeFunction"
+      Principal: "events.amazonaws.com"
+      SourceArn: 
+        !GetAtt ebsChangeRule.Arn
+
+  
