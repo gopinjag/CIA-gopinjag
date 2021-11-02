@@ -1,0 +1,57 @@
+{
+    "Version": "2012-10-17",
+    "Id": "PolicyForSourceBucket",
+    "Statement": [
+        {
+            "Sid": "DenyIncorrectEncryptionHeader",
+            "Effect": "Deny",
+            "Principal": "*",
+            "Action": "s3:PutObject",
+            "Resource": "arn:aws:s3:::usaa-cybervault-source/*",
+            "Condition": {
+                "StringNotEquals": {
+                    "s3:x-amz-server-side-encryption": "aws:kms"
+                }
+            }
+        },
+        {
+            "Sid": "DenyIncorrectEncryptionKey",
+            "Effect": "Deny",
+            "Principal": "*",
+            "Action": "s3:PutObject",
+            "Resource": "arn:aws:s3:::usaa-cybervault-source/*",
+            "Condition": {
+                "StringNotEquals": {
+                    "s3:x-amz-server-side-encryption-aws-kms-key-id": "arn:aws:kms:us-east-1:824748568953:key/0974d7e5-28c4-44ff-a51f-7274f98053bd"
+                }
+            }
+        },
+        {
+            "Sid": "DenyUnEncryptedObjectUploads",
+            "Effect": "Deny",
+            "Principal": "*",
+            "Action": "s3:PutObject",
+            "Resource": "arn:aws:s3:::usaa-cybervault-source/*",
+            "Condition": {
+                "Null": {
+                    "s3:x-amz-server-side-encryption": "true"
+                }
+            }
+        },
+        {
+            "Sid": "SecureDataTransfer",
+            "Effect": "Deny",
+            "Principal": "*",
+            "Action": "s3:*",
+            "Resource": [
+                "arn:aws:s3:::usaa-cybervault-source/*",
+                "arn:aws:s3:::usaa-cybervault-source"
+            ],
+            "Condition": {
+                "Bool": {
+                    "aws:SecureTransport": "False"
+                }
+            }
+        }
+    ]
+}

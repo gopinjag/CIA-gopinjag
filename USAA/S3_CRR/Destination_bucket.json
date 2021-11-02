@@ -1,0 +1,83 @@
+{
+    "Version": "2012-10-17",
+    "Id": "PolicyForDestinationBucket",
+    "Statement": [
+        {
+            "Sid": "Permissions on objects",
+            "Effect": "Allow",
+            "Principal": {
+                "AWS": "arn:aws:iam::824748568953:role/CyberVault-CrossRegion-Role"
+            },
+            "Action": [
+                "s3:ReplicateDelete",
+                "s3:ReplicateObject",
+                "s3:ObjectOwnerOverrideToBucketOwner"
+            ],
+            "Resource": "arn:aws:s3:::usaa-cybervault-destination/*"
+        },
+        {
+            "Sid": "Permissions on bucket",
+            "Effect": "Allow",
+            "Principal": {
+                "AWS": "arn:aws:iam::824748568953:role/CyberVault-CrossRegion-Role"
+            },
+            "Action": [
+                "s3:List*",
+                "s3:GetBucketVersioning",
+                "s3:PutBucketVersioning"
+            ],
+            "Resource": "arn:aws:s3:::usaa-cybervault-destination"
+        },
+        {
+            "Sid": "DenyIncorrectEncryptionHeader",
+            "Effect": "Deny",
+            "Principal": "*",
+            "Action": "s3:PutObject",
+            "Resource": "arn:aws:s3:::usaa-cybervault-destination/*",
+            "Condition": {
+                "StringNotEquals": {
+                    "s3:x-amz-server-side-encryption": "aws:kms"
+                }
+            }
+        },
+        {
+            "Sid": "DenyIncorrectEncryptionKey",
+            "Effect": "Deny",
+            "Principal": "*",
+            "Action": "s3:PutObject",
+            "Resource": "arn:aws:s3:::usaa-cybervault-destination/*",
+            "Condition": {
+                "StringNotEquals": {
+                    "s3:x-amz-server-side-encryption-aws-kms-key-id": "arn:aws:kms:us-east-2:241576475648:key/aac1ff12-7c32-4bc7-a90a-0663f1683116"
+                }
+            }
+        },
+        {
+            "Sid": "DenyUnEncryptedObjectUploads",
+            "Effect": "Deny",
+            "Principal": "*",
+            "Action": "s3:PutObject",
+            "Resource": "arn:aws:s3:::usaa-cybervault-destination/*",
+            "Condition": {
+                "Null": {
+                    "s3:x-amz-server-side-encryption": "true"
+                }
+            }
+        },
+        {
+            "Sid": "SecureDataTransfer",
+            "Effect": "Deny",
+            "Principal": "*",
+            "Action": "s3:*",
+            "Resource": [
+                "arn:aws:s3:::usaa-cybervault-destination/*",
+                "arn:aws:s3:::usaa-cybervault-destination"
+            ],
+            "Condition": {
+                "Bool": {
+                    "aws:SecureTransport": "False"
+                }
+            }
+        }
+    ]
+}
