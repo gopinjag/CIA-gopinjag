@@ -1,0 +1,72 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:GetReplicationConfiguration",
+                "s3:ListBucket"
+            ],
+            "Resource": [
+                "arn:aws:s3:::<source-bucket>"
+            ]
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:GetObjectVersionForReplication",
+                "s3:GetObjectVersionAcl",
+                "s3:GetObjectVersionTagging"
+            ],
+            "Resource": [
+                "arn:aws:s3:::<source-bucket>/*"
+            ]
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:ReplicateObject",
+                "s3:ReplicateDelete",
+                "s3:ReplicateTags",
+                "s3:ObjectOwnerOverrideToBucketOwner"
+            ],
+            "Resource": "arn:aws:s3:::<destination-bucket>/*"
+        },
+        {
+            "Sid": "KMSDecryptSource",
+            "Effect": "Allow",
+            "Action": [
+                "kms:Decrypt"
+            ],
+            "Condition": {
+                "StringLike": {
+                    "kms:ViaService": "s3.us-east-1.amazonaws.com",
+                    "kms:EncryptionContext:aws:s3:arn": [
+                        "arn:aws:s3:::<source-bucket>"
+                    ]
+                }
+            },
+            "Resource": [
+                "<source-Kms-key>"
+            ]
+        },
+        {
+            "Sid": "KMSEncryptDestination",
+            "Effect": "Allow",
+            "Action": [
+                "kms:Encrypt"
+            ],
+            "Condition": {
+                "StringLike": {
+                    "kms:ViaService": "s3.us-east-2.amazonaws.com",
+                    "kms:EncryptionContext:aws:s3:arn": [
+                        "arn:aws:s3:::usaa-cybervault-destination"
+                    ]
+                }
+            },
+            "Resource": [
+                "<Destination-Kms-key>"
+            ]
+        }
+    ]
+}
