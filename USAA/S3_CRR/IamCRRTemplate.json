@@ -1,0 +1,234 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Parameters": {
+        "sourcebucket": {
+            "Type": "String",
+            "Description": "Enter the sourcebucket name which should have objects replicated."
+        },
+        "sourceKMS": {
+            "Type": "String",
+            "Description": "Enter the kms key arn for the source account."
+        },
+        "DestinationKMS": {
+            "Type": "String",
+            "Description": "Enter the kms key arn for the destination account."
+        },
+        "DestinationDRKMS": {
+            "Type": "String",
+            "Description": "Enter the kms key arn for the destination account DR(us-west-1) region"
+        }
+    },
+    "Resources": {
+        "CrossRegionRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "s3.amazonaws.com"
+                                ]
+                            },
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                    ]
+                },
+                "Path": "/",
+                "Policies": [
+                    {
+                        "PolicyName": "CrossRegionReplicationPolicy",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "s3:GetReplicationConfiguration",
+                                        "s3:ListBucket"
+                                    ],
+                                    "Resource": {
+                                        "Fn::Join": [
+                                            "",
+                                            [
+                                                "arn:aws:s3:::",
+                                                {
+                                                    "Ref": "sourcebucket"
+                                                }
+                                            ]
+                                        ]
+                                    }
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "s3:GetObjectVersionForReplication",
+                                        "s3:GetObjectVersionAcl",
+                                        "s3:GetObjectVersionTagging"
+                                    ],
+                                    "Resource": {
+                                        "Fn::Join": [
+                                            "",
+                                            [
+                                                "arn:aws:s3:::",
+                                                {
+                                                    "Ref": "sourcebucket"
+                                                }
+                                            ]
+                                        ]
+                                    }
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "s3:ReplicateObject",
+                                        "s3:ReplicateDelete",
+                                        "s3:ReplicateTags",
+                                        "s3:ObjectOwnerOverrideToBucketOwner"
+                                    ],
+                                    "Resource": {
+                                        "Fn::Join": [
+                                            "",
+                                            [
+                                                "arn:aws:s3:::",
+                                                {
+                                                    "Ref": "AWS::AccountId"
+                                                },
+                                                "-",
+                                                {
+                                                    "Ref": "sourcebucket"
+                                                }
+                                            ]
+                                        ]
+                                    }
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "s3:ReplicateObject",
+                                        "s3:ReplicateDelete",
+                                        "s3:ReplicateTags",
+                                        "s3:ObjectOwnerOverrideToBucketOwner"
+                                    ],
+                                    "Resource": {
+                                        "Fn::Join": [
+                                            "",
+                                            [
+                                                "arn:aws:s3:::",
+                                                {
+                                                    "Ref": "AWS::AccountId"
+                                                },
+                                                "-",
+                                                {
+                                                    "Ref": "sourcebucket"
+                                                },
+                                                "-dr"
+                                            ]
+                                        ]
+                                    }
+                                },
+                                {
+                                    "Sid": "KMSDecryptSource",
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "kms:Decrypt"
+                                    ],
+                                    "Condition": {
+                                        "StringLike": {
+                                            "kms:ViaService": "s3.us-east-1.amazonaws.com",
+                                            "kms:EncryptionContext:aws:s3:arn": [
+                                                {
+                                                    "Fn::Join": [
+                                                        "",
+                                                        [
+                                                            "arn:aws:s3:::",
+                                                            {
+                                                                "Ref": "sourcebucket"
+                                                            }
+                                                        ]
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "Resource": {
+                                        "Ref": "sourceKMS"
+                                    }
+                                },
+                                {
+                                    "Sid": "KMSEncryptDestination",
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "kms:Encrypt"
+                                    ],
+                                    "Condition": {
+                                        "StringLike": {
+                                            "kms:ViaService": "s3.us-east-1.amazonaws.com",
+                                            "kms:EncryptionContext:aws:s3:arn": [
+                                                {
+                                                    "Fn::Join": [
+                                                        "",
+                                                        [
+                                                            "arn:aws:s3:::",
+                                                            {
+                                                                "Ref": "AWS::AccountId"
+                                                            },
+                                                            "-",
+                                                            {
+                                                                "Ref": "sourcebucket"
+                                                            }
+                                                        ]
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "Resource": {
+                                        "Ref": "DestinationKMS"
+                                    }
+                                },
+                                {
+                                    "Sid": "KMSEncryptDRDestination",
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "kms:Encrypt"
+                                    ],
+                                    "Condition": {
+                                        "StringLike": {
+                                            "kms:ViaService": "s3.us-west-1.amazonaws.com",
+                                            "kms:EncryptionContext:aws:s3:arn": [
+                                                {
+                                                    "Fn::Join": [
+                                                        "",
+                                                        [
+                                                            "arn:aws:s3:::",
+                                                            {
+                                                                "Ref": "AWS::AccountId"
+                                                            },
+                                                            "-",
+                                                            {
+                                                                "Ref": "sourcebucket"
+                                                            },
+                                                            "-dr"
+                                                        ]
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "Resource": {
+                                        "Ref": "DestinationDRKMS"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        }
+    }
+}
